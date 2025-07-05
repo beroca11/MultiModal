@@ -26,9 +26,11 @@ interface ChatInputProps {
   conversationId: number | null;
   selectedModel: string;
   onMessageSent?: () => void;
+  onThinkingChange?: (isThinking: boolean, model?: string) => void;
+  onUserMessageSent?: (message: { content: string; role: string; id: string; timestamp: Date }) => void;
 }
 
-export default function ChatInput({ conversationId, selectedModel, onMessageSent }: ChatInputProps) {
+export default function ChatInput({ conversationId, selectedModel, onMessageSent, onThinkingChange, onUserMessageSent }: ChatInputProps) {
   const [message, setMessage] = useState("");
   const [activeTools, setActiveTools] = useState<string[]>([]);
   const [codeContent, setCodeContent] = useState("");
@@ -53,24 +55,50 @@ export default function ChatInput({ conversationId, selectedModel, onMessageSent
         
         // Send message to new conversation
         const response = await apiRequest("POST", `/api/conversations/${conversation.id}/messages`, data);
-        return response.json();
+        return { ...response.json(), newConversationId: conversation.id };
       } else {
         const response = await apiRequest("POST", `/api/conversations/${conversationId}/messages`, data);
         return response.json();
       }
     },
-    onSuccess: () => {
+    onMutate: (data) => {
+      // Clear input field immediately
       setMessage("");
       setActiveTools([]);
       setCodeContent("");
       setImagePrompt("");
+      
+      // Show user message immediately
+      const userMessage = {
+        content: data.content,
+        role: "user",
+        id: `temp-${Date.now()}`,
+        timestamp: new Date()
+      };
+      onUserMessageSent?.(userMessage);
+      
+      // Show thinking UI when mutation starts
+      onThinkingChange?.(true, selectedModel);
+    },
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
-      if (conversationId) {
+      
+      // If this was a new conversation, invalidate messages for the new conversation ID
+      if (data.newConversationId) {
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/conversations", data.newConversationId, "messages"] });
+        }, 100);
+      } else if (conversationId) {
         queryClient.invalidateQueries({ queryKey: ["/api/conversations", conversationId, "messages"] });
       }
+      
+      // Hide thinking UI when mutation completes
+      onThinkingChange?.(false);
       onMessageSent?.();
     },
     onError: (error) => {
+      // Hide thinking UI on error
+      onThinkingChange?.(false);
       toast({
         title: "Error",
         description: "Failed to send message",

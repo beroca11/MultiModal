@@ -9,6 +9,7 @@ export interface IStorage {
   getConversationsByUserId(userId: number): Promise<Conversation[]>;
   createConversation(conversation: InsertConversation): Promise<Conversation>;
   updateConversation(id: number, updates: Partial<Conversation>): Promise<Conversation>;
+  deleteConversation(id: number, userId: number): Promise<void>;
   
   getMessage(id: number): Promise<Message | undefined>;
   getMessagesByConversationId(conversationId: number): Promise<Message[]>;
@@ -71,6 +72,7 @@ export class MemStorage implements IStorage {
       id,
       createdAt: now,
       updatedAt: now,
+      userId: insertConversation.userId || null,
     };
     this.conversations.set(id, conversation);
     return conversation;
@@ -91,6 +93,23 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
+  async deleteConversation(id: number, userId: number): Promise<void> {
+    const conversation = this.conversations.get(id);
+    if (!conversation || conversation.userId !== userId) {
+      throw new Error(`Conversation with id ${id} not found or does not belong to user ${userId}`);
+    }
+    
+    // Delete all messages associated with this conversation
+    Array.from(this.messages.entries()).forEach(([messageId, message]) => {
+      if (message.conversationId === id) {
+        this.messages.delete(messageId);
+      }
+    });
+    
+    // Delete the conversation
+    this.conversations.delete(id);
+  }
+
   async getMessage(id: number): Promise<Message | undefined> {
     return this.messages.get(id);
   }
@@ -107,6 +126,9 @@ export class MemStorage implements IStorage {
       ...insertMessage,
       id,
       createdAt: new Date(),
+      conversationId: insertMessage.conversationId || null,
+      model: insertMessage.model || null,
+      metadata: insertMessage.metadata || null,
     };
     this.messages.set(id, message);
     return message;

@@ -42,18 +42,21 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
         return "GPT-4o";
       case "claude-sonnet-4-20250514":
       case "claude":
-        return "Claude";
+        return "Claude Sonnet 4";
       case "gemini-2.5-flash":
       case "gemini":
-        return "Gemini";
+        return "Gemini 2.5 Flash";
       case "combined":
-        return "Combined";
+        return "Combined AI";
       default:
         return model;
     }
   };
 
-  const hasSearchResults = message.metadata?.searchResults;
+  const hasSearchResults = message.metadata && 
+    typeof message.metadata === 'object' && 
+    'searchResults' in message.metadata && 
+    message.metadata.searchResults;
 
   if (isUser) {
     return (
@@ -98,7 +101,7 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
                     </span>
                   </div>
                   <div className="space-y-2">
-                    {message.metadata.searchResults.results?.slice(0, 3).map((result: any, index: number) => (
+                    {(message.metadata as any)?.searchResults?.results?.slice(0, 3).map((result: any, index: number) => (
                       <div key={index} className="bg-white dark:bg-gray-700 rounded p-3">
                         <h4 className="text-sm font-medium text-gray-800 dark:text-gray-200">
                           {result.title}
@@ -138,7 +141,7 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
                     ),
                   }}
                 >
-                  {message.content}
+                  {String(message.content)}
                 </ReactMarkdown>
               </div>
             </CardContent>

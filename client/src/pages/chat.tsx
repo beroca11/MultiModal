@@ -15,6 +15,9 @@ export default function Chat() {
   const { id } = useParams<{ id?: string }>();
   const [selectedModel, setSelectedModel] = useState("auto");
   const [isToolsOpen, setIsToolsOpen] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
+  const [thinkingModel, setThinkingModel] = useState<string>();
+  const [tempMessages, setTempMessages] = useState<any[]>([]);
   const { theme, setTheme } = useTheme();
 
   const conversationId = id ? parseInt(id) : null;
@@ -28,6 +31,20 @@ export default function Chat() {
     queryKey: ["/api/conversations", conversationId, "messages"],
     enabled: !!conversationId,
   });
+
+  const handleThinkingChange = (thinking: boolean, model?: string) => {
+    setIsThinking(thinking);
+    setThinkingModel(model);
+    
+    // Clear temp messages when thinking stops (response received)
+    if (!thinking) {
+      setTempMessages([]);
+    }
+  };
+
+  const handleUserMessageSent = (userMessage: any) => {
+    setTempMessages([userMessage]);
+  };
 
   const toggleTheme = () => {
     setTheme(theme === "dark" ? "light" : "dark");
@@ -56,7 +73,11 @@ export default function Chat() {
                 </Badge>
                 <Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800">
                   <div className="w-2 h-2 rounded-full bg-blue-500 mr-1"></div>
-                  Claude Ready
+                  Claude Sonnet 4 Ready
+                </Badge>
+                <Badge variant="outline" className="bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800">
+                  <div className="w-2 h-2 rounded-full bg-purple-500 mr-1"></div>
+                  Gemini 2.5 Flash Ready
                 </Badge>
               </div>
             </div>
@@ -70,9 +91,9 @@ export default function Chat() {
                 <SelectContent>
                   <SelectItem value="auto">Auto Select</SelectItem>
                   <SelectItem value="gpt-4o">GPT-4o</SelectItem>
-                  <SelectItem value="claude">Claude</SelectItem>
-                  <SelectItem value="gemini">Gemini</SelectItem>
-                  <SelectItem value="combined">Combined Response</SelectItem>
+                  <SelectItem value="claude">Claude Sonnet 4</SelectItem>
+                  <SelectItem value="gemini">Gemini 2.5 Flash</SelectItem>
+                  <SelectItem value="combined">Combined AI</SelectItem>
                 </SelectContent>
               </Select>
               
@@ -105,9 +126,11 @@ export default function Chat() {
 
         {/* Messages */}
         <ChatMessages 
-          messages={messages || []} 
+          messages={[...(messages as any[] || []), ...tempMessages]} 
           conversationId={conversationId}
           isLoading={!conversationId}
+          isThinking={isThinking}
+          thinkingModel={thinkingModel}
         />
 
         {/* Input */}
@@ -115,6 +138,8 @@ export default function Chat() {
           conversationId={conversationId}
           selectedModel={selectedModel}
           onMessageSent={refetchMessages}
+          onThinkingChange={handleThinkingChange}
+          onUserMessageSent={handleUserMessageSent}
         />
       </div>
     </div>

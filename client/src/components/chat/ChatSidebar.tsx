@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Plus, MessageCircle, Search, Image, Code, User } from "lucide-react";
+import { Plus, MessageCircle, Search, Image, Code, User, Trash2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Conversation } from "@shared/schema";
@@ -21,16 +21,21 @@ export default function ChatSidebar({ conversations }: ChatSidebarProps) {
 
   const createConversationMutation = useMutation({
     mutationFn: async () => {
+      console.log("Creating new conversation...");
       const response = await apiRequest("POST", "/api/conversations", {
         title: "New Chat"
       });
-      return response.json();
+      const result = await response.json();
+      console.log("New conversation created:", result);
+      return result;
     },
     onSuccess: (newConversation) => {
+      console.log("Mutation success, navigating to:", newConversation.id);
       queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
       setLocation(`/chat/${newConversation.id}`);
     },
     onError: (error) => {
+      console.error("Mutation error:", error);
       toast({
         title: "Error",
         description: "Failed to create new chat",
@@ -38,6 +43,52 @@ export default function ChatSidebar({ conversations }: ChatSidebarProps) {
       });
     }
   });
+
+  const deleteConversationMutation = useMutation({
+    mutationFn: async (conversationId: number) => {
+      const response = await apiRequest("DELETE", `/api/conversations/${conversationId}`);
+      return response.json();
+    },
+    onSuccess: (_, conversationId) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+      
+      // If we deleted the currently active conversation, redirect to home
+      if (location === `/chat/${conversationId}`) {
+        setLocation("/");
+      }
+      
+      toast({
+        title: "Success",
+        description: "Conversation deleted successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to delete conversation",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const handleDeleteConversation = (e: React.MouseEvent, conversationId: number) => {
+    e.stopPropagation(); // Prevent navigation when clicking delete
+    const conversation = conversations.find(c => c.id === conversationId);
+    const title = conversation?.title || 'this conversation';
+    
+    if (confirm(`Are you sure you want to delete "${title}"? This action cannot be undone.`)) {
+      deleteConversationMutation.mutate(conversationId);
+    }
+  };
+
+  const handleNewChat = () => {
+    console.log("New Chat button clicked");
+    createConversationMutation.mutate();
+  };
+
+  const handleConversationClick = (conversationId: number) => {
+    setLocation(`/chat/${conversationId}`);
+  };
 
   const formatTimestamp = (timestamp: string | Date) => {
     const date = new Date(timestamp);
@@ -91,12 +142,21 @@ export default function ChatSidebar({ conversations }: ChatSidebarProps) {
       {/* New Chat Button */}
       <div className="p-4">
         <Button 
-          onClick={() => createConversationMutation.mutate()}
+          onClick={handleNewChat}
           disabled={createConversationMutation.isPending}
           className="w-full bg-teal-600 hover:bg-teal-700 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
         >
-          <Plus className="h-4 w-4" />
-          <span>New Chat</span>
+          {createConversationMutation.isPending ? (
+            <>
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              <span>Creating...</span>
+            </>
+          ) : (
+            <>
+              <Plus className="h-4 w-4" />
+              <span>New Chat</span>
+            </>
+          )}
         </Button>
       </div>
       
@@ -123,10 +183,26 @@ export default function ChatSidebar({ conversations }: ChatSidebarProps) {
                   </h3>
                   <div className="flex items-center space-x-2 mt-2">
                     <span className="text-xs text-gray-400">
-                      {formatTimestamp(conversation.updatedAt || conversation.createdAt)}
+                      {conversation.updatedAt
+                        ? new Date(conversation.updatedAt).toLocaleDateString()
+                        : "Just now"}
                     </span>
                   </div>
                 </div>
+                {/* Delete Button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400"
+                  onClick={(e) => handleDeleteConversation(e, conversation.id)}
+                  disabled={deleteConversationMutation.isPending}
+                >
+                  {deleteConversationMutation.isPending ? (
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                </Button>
               </div>
             </Link>
           ))}

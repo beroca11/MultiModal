@@ -21,6 +21,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create new conversation
   app.post("/api/conversations", async (req, res) => {
     try {
+      console.log("Creating new conversation with body:", req.body);
       const { title } = req.body;
       const userId = 1; // Demo user
       
@@ -29,7 +30,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId
       });
       
+      console.log("Created conversation:", conversation);
       res.json(conversation);
+    } catch (error) {
+      console.error("Error creating conversation:", error);
+      res.status(500).json({ error: (error as Error).message });
+    }
+  });
+
+  // Delete conversation
+  app.delete("/api/conversations/:id", async (req, res) => {
+    try {
+      const conversationId = parseInt(req.params.id);
+      const userId = 1; // Demo user
+      
+      // Delete the conversation and all its messages
+      await storage.deleteConversation(conversationId, userId);
+      
+      res.json({ success: true, message: "Conversation deleted successfully" });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }

@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import MessageBubble from "./MessageBubble";
+import ThinkingBubble from "./ThinkingBubble";
 import { Bot, Sparkles } from "lucide-react";
 import type { Message } from "@shared/schema";
 
@@ -11,16 +12,24 @@ interface ChatMessagesProps {
   messages: Message[];
   conversationId: number | null;
   isLoading?: boolean;
+  isThinking?: boolean;
+  thinkingModel?: string;
 }
 
-export default function ChatMessages({ messages, conversationId, isLoading }: ChatMessagesProps) {
+export default function ChatMessages({ 
+  messages, 
+  conversationId, 
+  isLoading, 
+  isThinking, 
+  thinkingModel 
+}: ChatMessagesProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
       scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, isThinking]);
 
   if (isLoading) {
     return (
@@ -50,6 +59,20 @@ export default function ChatMessages({ messages, conversationId, isLoading }: Ch
             <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
               Your multi-model AI assistant with web search, image generation, and code execution capabilities.
             </p>
+            <div className="mt-6 flex items-center justify-center space-x-4">
+              <Badge variant="outline" className="bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800">
+                <div className="w-2 h-2 rounded-full bg-green-500 mr-1"></div>
+                GPT-4o
+              </Badge>
+              <Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800">
+                <div className="w-2 h-2 rounded-full bg-blue-500 mr-1"></div>
+                Claude Sonnet 4
+              </Badge>
+              <Badge variant="outline" className="bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800">
+                <div className="w-2 h-2 rounded-full bg-purple-500 mr-1"></div>
+                Gemini 2.5 Flash
+              </Badge>
+            </div>
           </div>
         </div>
       </div>
@@ -63,6 +86,9 @@ export default function ChatMessages({ messages, conversationId, isLoading }: Ch
           {messages.map((message) => (
             <MessageBubble key={message.id} message={message} />
           ))}
+          {isThinking && (
+            <ThinkingBubble model={thinkingModel} />
+          )}
         </div>
       </div>
     </ScrollArea>

@@ -12,6 +12,8 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  console.log(`Making ${method} request to: ${url}`, data);
+  
   const res = await fetch(url, {
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
@@ -19,6 +21,8 @@ export async function apiRequest(
     credentials: "include",
   });
 
+  console.log(`Response status: ${res.status}`, res.statusText);
+  
   await throwIfResNotOk(res);
   return res;
 }
@@ -29,7 +33,10 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey[0] as string, {
+    // Construct the URL from the query key array
+    const url = Array.isArray(queryKey) ? queryKey.join('/') : String(queryKey[0]);
+    
+    const res = await fetch(url, {
       credentials: "include",
     });
 

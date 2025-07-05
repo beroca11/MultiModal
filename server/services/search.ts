@@ -12,7 +12,7 @@ export interface SearchResponse {
 }
 
 export async function performWebSearch(query: string): Promise<SearchResponse> {
-  const apiKey = process.env.SERPAPI_KEY || process.env.SERP_API_KEY;
+  const apiKey = process.env.SERPAPI_KEY || process.env.SERP_API_KEY || process.env.SERPER_API_KEY;
   
   if (!apiKey) {
     throw new Error("SerpAPI key not configured");
@@ -40,7 +40,7 @@ export async function performWebSearch(query: string): Promise<SearchResponse> {
       totalResults: data.search_information?.total_results || 0
     };
   } catch (error) {
-    throw new Error(`Web search failed: ${error.message}`);
+    throw new Error(`Web search failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -80,7 +80,7 @@ Please synthesize the information and provide key insights, trends, and importan
         summary = defaultResponse.content;
     }
   } catch (error) {
-    summary = `Error generating summary: ${error.message}`;
+    summary = `Error generating summary: ${error instanceof Error ? error.message : String(error)}`;
   }
 
   return {
