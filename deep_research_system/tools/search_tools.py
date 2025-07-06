@@ -30,27 +30,66 @@ class WebSearchTool(BaseTool):
     class InputSchema(BaseModel):
         query: str = Field(description="Search query")
         max_results: int = Field(default=5, description="Maximum number of results")
+        preferred_engine: str = Field(default="auto", description="Preferred search engine: tavily, serper, google, brave, duckduckgo, or auto")
     
-    def _run(self, query: str, max_results: int = 5) -> List[SearchResult]:
+    def _run(self, query: str, max_results: int = 5, preferred_engine: str = "auto") -> List[SearchResult]:
         results = []
         
-        # Try Tavily first if available
-        if Config.TAVILY_API_KEY:
-            try:
-                tavily_results = self._tavily_search(query, max_results)
-                results.extend(tavily_results)
-            except Exception as e:
-                print(f"Tavily search failed: {e}")
+        # Determine search order based on preference and availability
+        search_engines = self._get_search_engines(preferred_engine)
         
-        # Fallback to DuckDuckGo
-        if len(results) < max_results:
+        for engine in search_engines:
+            if len(results) >= max_results:
+                break
+                
             try:
-                ddg_results = self._duckduckgo_search(query, max_results - len(results))
-                results.extend(ddg_results)
+                if engine == "tavily" and Config.TAVILY_API_KEY:
+                    engine_results = self._tavily_search(query, max_results - len(results))
+                    results.extend(engine_results)
+                elif engine == "serper" and Config.SERPER_API_KEY:
+                    engine_results = self._serper_search(query, max_results - len(results))
+                    results.extend(engine_results)
+                elif engine == "google" and Config.GOOGLE_SEARCH_API_KEY:
+                    engine_results = self._google_search(query, max_results - len(results))
+                    results.extend(engine_results)
+                elif engine == "brave" and Config.BRAVE_API_KEY:
+                    engine_results = self._brave_search(query, max_results - len(results))
+                    results.extend(engine_results)
+                elif engine == "duckduckgo":
+                    engine_results = self._duckduckgo_search(query, max_results - len(results))
+                    results.extend(engine_results)
             except Exception as e:
-                print(f"DuckDuckGo search failed: {e}")
+                print(f"{engine.capitalize()} search failed: {e}")
+                continue
         
         return results[:max_results]
+    
+    def _get_search_engines(self, preferred: str) -> List[str]:
+        """Get ordered list of search engines to try"""
+        if preferred != "auto":
+            # Use preferred engine first, then fallbacks
+            engines = [preferred]
+            if preferred != "duckduckgo":
+                engines.append("duckduckgo")  # Always include as fallback
+            return engines
+        
+        # Auto mode: try based on availability
+        engines = []
+        
+        # Priority order based on quality and availability
+        if Config.TAVILY_API_KEY:
+            engines.append("tavily")
+        if Config.SERPER_API_KEY:
+            engines.append("serper")
+        if Config.GOOGLE_SEARCH_API_KEY:
+            engines.append("google")
+        if Config.BRAVE_API_KEY:
+            engines.append("brave")
+        
+        # Always include DuckDuckGo as fallback
+        engines.append("duckduckgo")
+        
+        return engines
     
     def _tavily_search(self, query: str, max_results: int) -> List[SearchResult]:
         """Search using Tavily API"""
@@ -74,6 +113,88 @@ class WebSearchTool(BaseTool):
                 snippet=item.get("content", ""),
                 source="tavily",
                 relevance_score=item.get("score", 0.0)
+            ))
+        
+        return results
+    
+    def _serper_search(self, query: str, max_results: int) -> List[SearchResult]:
+        """Search using Serper.dev API"""
+        url = "https://google.serper.dev/search"
+        headers = {
+            "X-API-KEY": Config.SERPER_API_KEY,
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "q": query,
+            "num": max_results
+        }
+        
+        response = requests.post(url, headers=headers, json=payload)
+        response.raise_for_status()
+        data = response.json()
+        
+        results = []
+        for item in data.get("organic", []):
+            results.append(SearchResult(
+                title=item.get("title", ""),
+                url=item.get("link", ""),
+                snippet=item.get("snippet", ""),
+                source="serper",
+                relevance_score=0.8
+            ))
+        
+        return results
+    
+    def _google_search(self, query: str, max_results: int) -> List[SearchResult]:
+        """Search using Google Custom Search API"""
+        url = "https://www.googleapis.com/customsearch/v1"
+        params = {
+            "key": Config.GOOGLE_SEARCH_API_KEY,
+            "cx": Config.GOOGLE_SEARCH_ENGINE_ID,
+            "q": query,
+            "num": min(max_results, 10)  # Google CSE max is 10
+        }
+        
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        data = response.json()
+        
+        results = []
+        for item in data.get("items", []):
+            results.append(SearchResult(
+                title=item.get("title", ""),
+                url=item.get("link", ""),
+                snippet=item.get("snippet", ""),
+                source="google",
+                relevance_score=0.9
+            ))
+        
+        return results
+    
+    def _brave_search(self, query: str, max_results: int) -> List[SearchResult]:
+        """Search using Brave Search API"""
+        url = "https://api.search.brave.com/res/v1/web/search"
+        headers = {
+            "Accept": "application/json",
+            "X-Subscription-Token": Config.BRAVE_API_KEY
+        }
+        params = {
+            "q": query,
+            "count": max_results
+        }
+        
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status()
+        data = response.json()
+        
+        results = []
+        for item in data.get("web", {}).get("results", []):
+            results.append(SearchResult(
+                title=item.get("title", ""),
+                url=item.get("url", ""),
+                snippet=item.get("description", ""),
+                source="brave",
+                relevance_score=0.8
             ))
         
         return results

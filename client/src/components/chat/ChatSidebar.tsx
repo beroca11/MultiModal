@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Plus, MessageCircle, Search, Image, Code, User, Trash2 } from "lucide-react";
+import { Plus, MessageCircle, Search, Image, Code, User, Trash2, Pencil, X, Check } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Conversation } from "@shared/schema";
@@ -18,6 +18,8 @@ export default function ChatSidebar({ conversations }: ChatSidebarProps) {
   const [location, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState("");
 
   const createConversationMutation = useMutation({
     mutationFn: async () => {
@@ -68,6 +70,21 @@ export default function ChatSidebar({ conversations }: ChatSidebarProps) {
         description: "Failed to delete conversation",
         variant: "destructive",
       });
+    }
+  });
+
+  const updateConversationMutation = useMutation({
+    mutationFn: async ({ id, title }: { id: number; title: string }) => {
+      const response = await apiRequest("PATCH", `/api/conversations/${id}`, { title });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+      setEditingId(null);
+      setEditValue("");
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update title", variant: "destructive" });
     }
   });
 
@@ -178,9 +195,45 @@ export default function ChatSidebar({ conversations }: ChatSidebarProps) {
                   {getConversationIcon(conversation.title)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
-                    {conversation.title}
-                  </h3>
+                  {editingId === conversation.id ? (
+                    <form
+                      onSubmit={e => {
+                        e.preventDefault();
+                        if (editValue.trim()) {
+                          updateConversationMutation.mutate({ id: conversation.id, title: editValue.trim() });
+                        }
+                      }}
+                      className="flex items-center space-x-2"
+                    >
+                      <input
+                        className="text-sm font-medium text-gray-800 dark:text-gray-200 bg-transparent border-b border-gray-300 dark:border-gray-600 focus:outline-none focus:border-teal-500 px-1 py-0.5 w-32"
+                        value={editValue}
+                        onChange={e => setEditValue(e.target.value)}
+                        autoFocus
+                        onBlur={() => setEditingId(null)}
+                      />
+                      <button type="submit" className="text-emerald-600 hover:text-emerald-800"><Check className="h-4 w-4" /></button>
+                      <button type="button" onClick={() => setEditingId(null)} className="text-gray-400 hover:text-red-500"><X className="h-4 w-4" /></button>
+                    </form>
+                  ) : (
+                    <div className="flex items-center group/title">
+                      <h3 className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
+                        {conversation.title}
+                      </h3>
+                      <button
+                        className="ml-1 opacity-0 group-hover/title:opacity-100 transition-opacity text-gray-400 hover:text-teal-600"
+                        onClick={e => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setEditingId(conversation.id);
+                          setEditValue(conversation.title);
+                        }}
+                        title="Edit title"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
                   <div className="flex items-center space-x-2 mt-2">
                     <span className="text-xs text-gray-400">
                       {conversation.updatedAt

@@ -19,6 +19,9 @@ class Config:
     # Search API Keys
     TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
     SERPER_API_KEY = os.getenv("SERPER_API_KEY")
+    GOOGLE_SEARCH_API_KEY = os.getenv("GOOGLE_SEARCH_API_KEY")
+    GOOGLE_SEARCH_ENGINE_ID = os.getenv("GOOGLE_SEARCH_ENGINE_ID")
+    BRAVE_API_KEY = os.getenv("BRAVE_API_KEY")
     
     # Database Configuration
     MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017/deepresearch")

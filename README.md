@@ -50,6 +50,12 @@ pip install -r requirements.txt
 
 **Recommended**: Tavily API Key for enhanced search capabilities
 
+**Alternative Search APIs**: The system supports multiple search engines including:
+- **Google Custom Search API** (recommended alternative to Travily)
+- **Serper.dev API** (Google search results)
+- **Brave Search API** (privacy-focused)
+- **DuckDuckGo** (free, no API key required)
+
 Create a `.env` file in the project root:
 
 ```bash
@@ -70,6 +76,12 @@ export GOOGLE_API_KEY="your_google_api_key_here"
 
 # Optional search API
 export TAVILY_API_KEY="your_tavily_api_key_here"
+
+# Alternative search APIs
+export SERPER_API_KEY="your_serper_api_key_here"
+export GOOGLE_SEARCH_API_KEY="your_google_search_api_key_here"
+export GOOGLE_SEARCH_ENGINE_ID="your_google_search_engine_id_here"
+export BRAVE_API_KEY="your_brave_api_key_here"
 
 # Set your preferred AI provider
 export PREFERRED_AI_PROVIDER="openai"  # or "anthropic" or "google"

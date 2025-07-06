@@ -14,7 +14,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const conversations = await storage.getConversationsByUserId(userId);
       res.json(conversations);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: (error as Error).message });
     }
   });
 
@@ -49,7 +49,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({ success: true, message: "Conversation deleted successfully" });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: (error as Error).message });
     }
   });
 
@@ -60,7 +60,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const messages = await storage.getMessagesByConversationId(conversationId);
       res.json(messages);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: (error as Error).message });
     }
   });
 
@@ -89,15 +89,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         /\b(search|latest|recent|current|news|update|trend|2024|2025)\b/i.test(content);
 
       let searchResults = null;
+      let searchSummary = null;
       let enhancedPrompt = content;
 
       if (needsSearch) {
         try {
           const searchResponse = await searchAndSummarize(content, model === "auto" ? "gpt-4o" : model);
           searchResults = searchResponse.searchResults;
+          
+          // Create a clean summary for the AI prompt
           enhancedPrompt = `${content}\n\nRecent web search results:\n${searchResponse.summary}`;
+          
+          // Store the summary and model info for the frontend
+          searchSummary = {
+            summary: searchResponse.summary,
+            modelUsed: searchResponse.modelUsed,
+            searchResults: searchResults
+          };
+          
         } catch (error) {
-          console.warn("Web search failed:", error.message);
+          console.warn("Web search failed:", (error as Error).message);
         }
       }
 
@@ -105,37 +116,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let aiResponse;
       let responseModel = model;
 
-      try {
-        if (model === "auto" || model === "combined") {
-          const multiResponse = await generateMultiModel(enhancedPrompt, ["gpt-4o", "claude", "gemini"]);
-          aiResponse = multiResponse.combined || multiResponse.responses[0]?.content || "No response generated";
-          responseModel = "combined";
-        } else if (model === "gpt-4o") {
-          const response = await generateWithGPT4o(enhancedPrompt);
-          aiResponse = response.content;
-        } else if (model === "claude") {
-          const response = await generateWithClaude(enhancedPrompt);
-          aiResponse = response.content;
-        } else if (model === "gemini") {
-          const response = await generateWithGemini(enhancedPrompt);
-          aiResponse = response.content;
-        } else {
-          const response = await generateWithGPT4o(enhancedPrompt);
-          aiResponse = response.content;
-          responseModel = "gpt-4o";
+      // If we have a search summary, use it as the main response instead of generating a new one
+      if (searchSummary && searchSummary.summary) {
+        aiResponse = searchSummary.summary;
+        responseModel = searchSummary.modelUsed || "search-agent";
+      } else {
+        // Only generate AI response if no search was performed
+        try {
+          if (model === "auto" || model === "combined") {
+            const multiResponse = await generateMultiModel(enhancedPrompt, ["gpt-4o", "claude", "gemini"]);
+            aiResponse = multiResponse.combined || multiResponse.responses[0]?.content || "No response generated";
+            responseModel = "combined";
+          } else if (model === "gpt-4o") {
+            const response = await generateWithGPT4o(enhancedPrompt);
+            aiResponse = response.content;
+          } else if (model === "claude") {
+            const response = await generateWithClaude(enhancedPrompt);
+            aiResponse = response.content;
+          } else if (model === "gemini") {
+            const response = await generateWithGemini(enhancedPrompt);
+            aiResponse = response.content;
+          } else {
+            const response = await generateWithGPT4o(enhancedPrompt);
+            aiResponse = response.content;
+            responseModel = "gpt-4o";
+          }
+        } catch (error) {
+          aiResponse = `I encountered an error while processing your request: ${(error as Error).message}`;
+          responseModel = "error";
         }
-      } catch (error) {
-        aiResponse = `I encountered an error while processing your request: ${error.message}`;
-        responseModel = "error";
       }
 
-      // Save assistant message
+      // Save assistant message with search summary
       const assistantMessage = await storage.createMessage({
         conversationId,
         role: "assistant",
         content: aiResponse,
         model: responseModel,
-        metadata: searchResults ? { searchResults } : null
+        metadata: searchResults ? { 
+          searchResults,
+          searchSummary 
+        } : null
       });
 
       // Update conversation timestamp
@@ -149,7 +170,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         searchResults
       });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: (error as Error).message });
     }
   });
 
@@ -165,7 +186,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await generateImage(prompt);
       res.json(result);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: (error as Error).message });
     }
   });
 
@@ -181,7 +202,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await analyzeImage(image, model);
       res.json(result);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: (error as Error).message });
     }
   });
 
@@ -197,7 +218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await searchAndSummarize(query, model);
       res.json(result);
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: (error as Error).message });
     }
   });
 

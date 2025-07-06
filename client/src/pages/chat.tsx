@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import ChatSidebar from "@/components/chat/ChatSidebar";
 import ChatMessages from "@/components/chat/ChatMessages";
 import ChatInput from "@/components/chat/ChatInput";
@@ -8,8 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useTheme } from "@/components/ui/theme-provider";
-import { Moon, Sun, Settings, Bolt, ChevronDown } from "lucide-react";
+import { Moon, Sun, Settings, Bolt, ChevronDown, Pencil, X, Check, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useMutation } from "@tanstack/react-query";
+import type { Conversation } from "@shared/schema";
 
 export default function Chat() {
   const { id } = useParams<{ id?: string }>();
@@ -19,6 +21,8 @@ export default function Chat() {
   const [thinkingModel, setThinkingModel] = useState<string>();
   const [tempMessages, setTempMessages] = useState<any[]>([]);
   const { theme, setTheme } = useTheme();
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [editValue, setEditValue] = useState("");
 
   const conversationId = id ? parseInt(id) : null;
 
@@ -31,6 +35,72 @@ export default function Chat() {
     queryKey: ["/api/conversations", conversationId, "messages"],
     enabled: !!conversationId,
   });
+
+  const queryClient = useQueryClient();
+  const updateConversationMutation = useMutation({
+    mutationFn: async ({ id, title }: { id: number; title: string }) => {
+      const response = await fetch(`/api/conversations/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title })
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+      setEditingTitle(false);
+      setEditValue("");
+    }
+  });
+  const deleteConversationMutation = useMutation({
+    mutationFn: async (conversationId: number) => {
+      const response = await fetch(`/api/conversations/${conversationId}`, { method: "DELETE" });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+      window.location.href = "/";
+    }
+  });
+
+  // Find the current conversation safely
+  const conversationList: Conversation[] = Array.isArray(conversations) ? conversations as Conversation[] : [];
+  const currentConversation = conversationList.find((c) => c.id === conversationId);
+
+  // After messages are updated, auto-update the conversation title if needed
+  useEffect(() => {
+    if (!conversationId || !Array.isArray(messages) || !messages.length) return;
+    // Find the latest assistant message with a summary
+    const lastAssistant = [...messages].reverse().find(
+      (msg: any) => msg.role === "assistant" && msg.metadata && msg.metadata.searchSummary && msg.metadata.searchSummary.summary
+    );
+    if (!lastAssistant) return;
+    // Prefer the search query as the title
+    let summaryTitle = "";
+    const searchSummary = lastAssistant.metadata.searchSummary;
+    if (searchSummary.searchResults && searchSummary.searchResults.query) {
+      summaryTitle = searchSummary.searchResults.query.trim();
+    }
+    // Fallback: first non-empty line of the summary
+    if (!summaryTitle) {
+      const summary = searchSummary.summary as string;
+      const headingMatch = summary.match(/^(.*?)(\n|$)/);
+      if (headingMatch) {
+        summaryTitle = headingMatch[1].replace(/[*#:\-]+/g, '').trim();
+      }
+    }
+    if (!summaryTitle) return;
+    // If the current conversation title is 'New Chat', update it
+    if (currentConversation && currentConversation.title === "New Chat") {
+      fetch(`/api/conversations/${conversationId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: summaryTitle })
+      }).then(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+      });
+    }
+  }, [messages, conversationId, currentConversation, queryClient]);
 
   const handleThinkingChange = (thinking: boolean, model?: string) => {
     setIsThinking(thinking);
@@ -61,9 +131,62 @@ export default function Chat() {
         <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
-                {conversationId ? "Current Chat" : "AI Assistant"}
-              </h2>
+              {conversationId && currentConversation ? (
+                <div className="flex items-center group">
+                  {editingTitle ? (
+                    <form
+                      onSubmit={e => {
+                        e.preventDefault();
+                        if (editValue.trim()) {
+                          updateConversationMutation.mutate({ id: conversationId, title: editValue.trim() });
+                        }
+                      }}
+                      className="flex items-center space-x-2"
+                    >
+                      <input
+                        className="text-xl font-semibold text-gray-800 dark:text-gray-100 bg-transparent border-b border-gray-300 dark:border-gray-600 focus:outline-none focus:border-teal-500 px-1 py-0.5 w-48"
+                        value={editValue}
+                        onChange={e => setEditValue(e.target.value)}
+                        autoFocus
+                        onBlur={() => setEditingTitle(false)}
+                      />
+                      <button type="submit" className="text-emerald-600 hover:text-emerald-800"><Check className="h-5 w-5" /></button>
+                      <button type="button" onClick={() => setEditingTitle(false)} className="text-gray-400 hover:text-red-500"><X className="h-5 w-5" /></button>
+                    </form>
+                  ) : (
+                    <>
+                      <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
+                        {currentConversation.title}
+                      </h2>
+                      <button
+                        className="ml-2 text-gray-400 hover:text-teal-600"
+                        onClick={() => {
+                          setEditingTitle(true);
+                          setEditValue(currentConversation.title);
+                        }}
+                        title="Edit title"
+                      >
+                        <Pencil className="h-5 w-5" />
+                      </button>
+                      <button
+                        className="ml-1 text-gray-400 hover:text-red-600"
+                        onClick={() => {
+                          if (window.confirm("Are you sure you want to delete this conversation?")) {
+                            deleteConversationMutation.mutate(conversationId);
+                          }
+                        }}
+                        title="Delete conversation"
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
+                  AI Assistant
+                </h2>
+              )}
               
               {/* Status Indicators */}
               <div className="flex items-center space-x-2">

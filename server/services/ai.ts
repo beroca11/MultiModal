@@ -35,10 +35,12 @@ export interface MultiModelResponse {
 
 export async function generateWithGPT4o(prompt: string, context?: any): Promise<AIResponse> {
   try {
+    const cleanPrompt = `${prompt}\n\nPlease provide a well-structured, professional response without using any markdown symbols (#, *, -, etc.). Write in clear, readable paragraphs with proper formatting.`;
+    
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
-        { role: "user", content: prompt }
+        { role: "user", content: cleanPrompt }
       ],
       max_tokens: 2000,
     });
@@ -49,15 +51,17 @@ export async function generateWithGPT4o(prompt: string, context?: any): Promise<
       metadata: context
     };
   } catch (error) {
-    throw new Error(`OpenAI API error: ${error.message}`);
+    throw new Error(`OpenAI API error: ${(error as Error).message}`);
   }
 }
 
 export async function generateWithClaude(prompt: string, context?: any): Promise<AIResponse> {
   try {
+    const cleanPrompt = `${prompt}\n\nPlease provide a well-structured, professional response without using any markdown symbols (#, *, -, etc.). Write in clear, readable paragraphs with proper formatting.`;
+    
     const message = await anthropic.messages.create({
       max_tokens: 2000,
-      messages: [{ role: 'user', content: prompt }],
+      messages: [{ role: 'user', content: cleanPrompt }],
       model: DEFAULT_MODEL_STR,
     });
 
@@ -67,15 +71,17 @@ export async function generateWithClaude(prompt: string, context?: any): Promise
       metadata: context
     };
   } catch (error) {
-    throw new Error(`Anthropic API error: ${error.message}`);
+    throw new Error(`Anthropic API error: ${(error as Error).message}`);
   }
 }
 
 export async function generateWithGemini(prompt: string, context?: any): Promise<AIResponse> {
   try {
+    const cleanPrompt = `${prompt}\n\nPlease provide a well-structured, professional response without using any markdown symbols (#, *, -, etc.). Write in clear, readable paragraphs with proper formatting.`;
+    
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: prompt,
+      contents: cleanPrompt,
     });
 
     return {
@@ -84,7 +90,7 @@ export async function generateWithGemini(prompt: string, context?: any): Promise
       metadata: context
     };
   } catch (error) {
-    throw new Error(`Gemini API error: ${error.message}`);
+    throw new Error(`Gemini API error: ${(error as Error).message}`);
   }
 }
 
@@ -105,7 +111,7 @@ export async function generateMultiModel(prompt: string, models: string[] = ["gp
       }
     } catch (error) {
       return {
-        content: `Error with ${model}: ${error.message}`,
+        content: `Error with ${model}: ${(error as Error).message}`,
         model,
         metadata: { error: true }
       };
@@ -122,7 +128,7 @@ export async function generateMultiModel(prompt: string, models: string[] = ["gp
 
 ${responses.map((r, i) => `${r.model}: ${r.content}`).join('\n\n')}
 
-Please provide a comprehensive response that combines the best insights from all models:`;
+Please provide a comprehensive, well-structured response that combines the best insights from all models. Write in clear, professional paragraphs without using any markdown symbols (#, *, -, etc.). Focus on delivering actionable insights and valuable information.`;
 
       const combined = await generateWithGPT4o(combinedPrompt);
       return {
@@ -148,11 +154,11 @@ export async function generateImage(prompt: string): Promise<{ url: string; mode
     });
 
     return {
-      url: response.data[0].url || "",
+      url: response.data?.[0]?.url || "",
       model: "dall-e-3"
     };
   } catch (error) {
-    throw new Error(`Image generation error: ${error.message}`);
+    throw new Error(`Image generation error: ${(error as Error).message}`);
   }
 }
 
@@ -216,6 +222,6 @@ export async function analyzeImage(base64Image: string, model: string = "gpt-4o"
 
     throw new Error(`Image analysis not supported for model: ${model}`);
   } catch (error) {
-    throw new Error(`Image analysis error: ${error.message}`);
+    throw new Error(`Image analysis error: ${(error as Error).message}`);
   }
 }

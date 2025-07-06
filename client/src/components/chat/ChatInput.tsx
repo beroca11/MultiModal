@@ -203,47 +203,29 @@ export default function ChatInput({ conversationId, selectedModel, onMessageSent
         )}
         
         {/* Main Input */}
-        <div className="flex items-end space-x-4">
-          <div className="flex-1">
-            <div className="relative">
-              <Textarea
-                ref={textareaRef}
-                value={message}
-                onChange={handleTextareaChange}
-                onKeyDown={handleKeyDown}
-                placeholder="Ask me anything... (Enter to send, Shift+Enter for new line)"
-                className="min-h-[44px] max-h-[200px] bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 pr-12 resize-none"
-                style={{ height: '44px' }}
-              />
-              
-              <Button
-                variant="ghost"
-                size="sm"
-                className="absolute right-12 top-1/2 transform -translate-y-1/2 p-2 h-8 w-8"
-              >
-                <Paperclip className="h-4 w-4" />
-              </Button>
-              
-              <Button
-                variant="ghost"
-                size="sm"
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 p-2 h-8 w-8"
-              >
-                <Mic className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-          
+        <div className="relative">
+          <Textarea
+            ref={textareaRef}
+            value={message}
+            onChange={handleTextareaChange}
+            onKeyDown={handleKeyDown}
+            placeholder="Type your message here... (Press Enter to send, Shift+Enter for new line)"
+            className="w-full min-h-[60px] max-h-[200px] resize-none rounded-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-6 py-4 pr-16 focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+            disabled={sendMessageMutation.isPending}
+          />
           <Button
             onClick={handleSubmit}
             disabled={!message.trim() || sendMessageMutation.isPending}
-            className="bg-teal-600 hover:bg-teal-700 text-white p-3 rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg"
+            className="absolute right-4 bottom-4 h-12 w-12 p-0 bg-teal-600 hover:bg-teal-700 text-white rounded-full transition-colors flex items-center justify-center shadow-md"
           >
-            <Send className="h-4 w-4" />
+            {sendMessageMutation.isPending ? (
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+            ) : (
+              <Send className="h-5 w-5" />
+            )}
           </Button>
         </div>
-        
-        {/* Quick Actions */}
+
         <div className="flex items-center justify-between mt-3">
           <div className="flex items-center space-x-3">
             <Button
@@ -252,8 +234,8 @@ export default function ChatInput({ conversationId, selectedModel, onMessageSent
               onClick={() => toggleTool("search")}
               className={`flex items-center space-x-1 text-xs transition-colors ${
                 activeTools.includes("search") 
-                  ? 'text-teal-600 bg-teal-50 dark:bg-teal-900/20' 
-                  : 'text-gray-500 hover:text-teal-600'
+                  ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20' 
+                  : 'text-gray-500 hover:text-emerald-600'
               }`}
             >
               <Search className="h-3 w-3" />
